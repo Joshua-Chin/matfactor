@@ -19,6 +19,7 @@ def factorize(x,
               int dim=40,
               int epochs=5,
               bool shuffle=True,
+              bool bias=False,
               double learning_rate=0.05,
               int x_max=100,
               double alpha=0.75,
@@ -30,14 +31,15 @@ def factorize(x,
     Factorizes a sparse matrix `x` as `e ** (u * v)`
 
     Solves the equation `x = e ** (u * v)` by minimizing
-    `sum_{i,j} f(X_ij)(u_i \dot v_j - log X_ij)^2` where
-    `f(x) = min((x / x_max) ** alpha, 1)`. This function
-    uses the adagrad gradient descent algorithm.
+    `sum_{i,j} f(X_ij)(u_i \dot v_j + b_i + b_j - log X_ij)^2`
+    where `f(x) = min((x / x_max) ** alpha, 1)`. This function
+    uses the Adagrad gradient descent algorithm.
 
-    This function was inspired by GloVe (Pennington et Al).
-    You can view their site at `nlp.stanford.edu/projects/glove/`
-    This function differs by omitting the bias vector and
-    allowing an arbitrarily shaped sparse matrix as input.
+    This function expands on the algorithm used by Pennington
+    et Al in their GloVe paper. You can view their site at
+    `nlp.stanford.edu/projects/glove/` This function allows
+    an arbitrarily shaped sparse matrix as input instead of
+    only a square matrix.
 
     Parameters
     ----------
@@ -47,6 +49,8 @@ def factorize(x,
         The number of columns of u and v
     shuffle : bool, optional
         Whether to shuffle the input matrix
+    bias : bool, optional
+        Whether to learn bias vectors
     learning_rate : float, optional
         The initial learning rate
     epochs : int, optional
@@ -63,13 +67,16 @@ def factorize(x,
     Returns
     -------
     u:(M, dim) array
-    v:(M, dim) array
+    v:(N, dim) array
+    ub: (M, dim) row bias. Only returned if `bias` is `True`
+    vb: (N, dim) col bias. Only returned if `bias` is `True`
     """
 
-    cdef int n_rows, n_cols, epoch, i, j
+    cdef int n_rows, n_cols, epoch, i, j, bias_bit
     cdef int[:] rows, cols
     cdef double total_error, prediction, diff, fdiff, t1, t2
     cdef double[:] vals, error
+    cdef double[:] row_bias, col_bias, rb_grad_sq, cb_grad_sq,
     cdef double[:, :] row_vecs, col_vecs, row_grad_sq, col_grad_sq
     cdef Entry elem
     cdef Entry[:] coo_matrix
@@ -83,6 +90,8 @@ def factorize(x,
         vals.shape,
         dtype=np.dtype([('row', np.int32), ('col', np.int32), ('val', np.float64)])
     )
+
+    bias_bit = bias
 
     for i in range(vals.shape[0]):
         coo_matrix[i].row = rows[i]
@@ -107,6 +116,12 @@ def factorize(x,
     row_grad_sq = np.ones_like(row_vecs)
     col_grad_sq = np.ones_like(col_vecs)
 
+    if bias_bit:
+        row_bias = np.zeros(n_rows)
+        col_bias = np.zeros(n_cols)
+        rb_grad_sq = np.zeros(n_rows)
+        cb_grad_sq = np.zeros(n_cols)
+
     error = np.zeros(coo_matrix.shape[0])
 
     for epoch in range(epochs):
@@ -124,6 +139,10 @@ def factorize(x,
                 prediction = prediction + row_vecs[elem.row, j] * col_vecs[elem.col, j]
 
             diff = prediction - log(elem.val)
+
+            if bias_bit:
+                diff = diff + row_bias[elem.row] + col_bias[elem.col]
+
             fdiff = diff if elem.val > x_max else pow(elem.val / x_max, alpha) * diff
 
             error[i] = 0.5 * fdiff * diff
@@ -138,10 +157,21 @@ def factorize(x,
                 row_grad_sq[elem.row, j] += t2 * t2
                 col_grad_sq[elem.col, j] += t1 * t1
 
+            if bias_bit:
+                row_bias[elem.row] -= fdiff / sqrt(rb_grad_sq[elem.row])
+                col_bias[elem.col] -= fdiff / sqrt(cb_grad_sq[elem.col])
+                fdiff = fdiff * fdiff
+                cb_grad_sq[elem.row] += fdiff
+                rb_grad_sq[elem.col] += fdiff
+
         total_error = 0.0
         for i in range(coo_matrix.shape[0]):
             total_error += error[i]
         if verbose:
           print(total_error / error.shape[0])
 
-    return np.asarray(row_vecs), np.asarray(col_vecs)
+    if bias_bit:
+        return (np.asarray(row_vecs), np.asarray(col_vecs),
+                np.asarray(row_bias), np.asarray(col_bias))
+    else:
+        return np.asarray(row_vecs), np.asarray(col_vecs)

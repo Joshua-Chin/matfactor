@@ -17,7 +17,7 @@ setup(
     cmdclass={'build_ext':build_ext},
     ext_modules=[
         Extension(
-            'matfactor/_factorize',
+            'matfactor._factorize',
             ['matfactor/_factorize.pyx'],
             extra_compile_args=['-fopenmp'],
             extra_link_args=['-fopenmp']
