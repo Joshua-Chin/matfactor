@@ -1,8 +1,12 @@
 #cython: boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False
 
+from cpython cimport bool
+
+from cython.parallel import prange
+
 import numpy as np
 cimport numpy as np
-from cython.parallel import prange
+
 from libc.math cimport sqrt, log, pow
 
 cdef packed struct Entry:
@@ -76,14 +80,14 @@ def factorize(x,
     vals = x.data
 
     coo_matrix = np.zeros(
-        data.shape
+        vals.shape,
         dtype=np.dtype([('row', np.int32), ('col', np.int32), ('val', np.float64)])
     )
 
-    for i in range(data.shape[0]):
+    for i in range(vals.shape[0]):
         coo_matrix[i].row = rows[i]
         coo_matrix[i].col = cols[i]
-        coo_matrix[i].val = data[i]
+        coo_matrix[i].val = vals[i]
 
     if shuffle:
         np.random.shuffle(coo_matrix)
@@ -110,7 +114,7 @@ def factorize(x,
         for i in prange(coo_matrix.shape[0],
                         num_threads=threads,
                         nogil=True,
-                        chunksize=coo_matrix.shape[0] // num_threads + 1,
+                        chunksize=coo_matrix.shape[0] // threads + 1,
                         schedule='static'):
 
             elem = coo_matrix[i]
