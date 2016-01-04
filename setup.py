@@ -12,7 +12,11 @@ setup(
     name='matfactor',
     version='1.0.0',
     description='A small library for factorizing matrices',
+    long_description="A small library for factorizing matrices. Given a sparse matrix M, it finds matrices u,v that minimize M - e ** (u*v)",
     author='Joshua Chin',
+    author_email='JoshuaRChin@gmail.com',
+    url='https://github.com/Joshua-Chin/matfactor/tree/master',
+    license='License :: OSI Approved :: Apache Software License',
     install_requires=['cython'],
     cmdclass={'build_ext':build_ext},
     ext_modules=[
