@@ -1,5 +1,7 @@
 #cython: boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False
 
+from __future__ import print_function
+
 from cpython cimport bool
 
 from cython.parallel import prange
@@ -62,7 +64,7 @@ def factorize(x,
     threads : int, optional
         The number of threads to use
     verbose: bool, optional
-        Whether to print the error for each epoch
+        Whether to print extra information
 
     Returns
     -------
@@ -87,19 +89,28 @@ def factorize(x,
     vals = x.data
 
     coo_matrix = np.zeros(
-        vals.shape,
+        vals.shape[0],
         dtype=np.dtype([('row', np.int32), ('col', np.int32), ('val', np.float64)])
     )
 
     bias_bit = bias
+
+
+
+    if verbose:
+        print("Reshaping matrix")
 
     for i in range(vals.shape[0]):
         coo_matrix[i].row = rows[i]
         coo_matrix[i].col = cols[i]
         coo_matrix[i].val = vals[i]
 
+    if verbose:
+        print("Shuffling data")
+
     if shuffle:
         np.random.shuffle(coo_matrix)
+
 
     n_rows = 0
     n_cols = 0
@@ -125,6 +136,9 @@ def factorize(x,
     error = np.zeros(coo_matrix.shape[0])
 
     for epoch in range(epochs):
+
+        if verbose:
+          print("Epoch %s: "%(epoch+1,), end='', flush=True)
 
         for i in prange(coo_matrix.shape[0],
                         num_threads=threads,
@@ -168,7 +182,7 @@ def factorize(x,
         for i in range(coo_matrix.shape[0]):
             total_error += error[i]
         if verbose:
-          print(total_error / error.shape[0])
+          print("error %s"%(total_error / error.shape[0]))
 
     if bias_bit:
         return (np.asarray(row_vecs), np.asarray(col_vecs),
