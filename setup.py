@@ -10,7 +10,7 @@ except:
 
 setup(
     name='matfactor',
-    version='1.0.3',
+    version='1.0.4',
     description='A small library for factorizing matrices',
     long_description="A small library for factorizing matrices. Given a sparse matrix M, it finds matrices u,v that minimize M - e ** (u*v)",
     author='Joshua Chin',

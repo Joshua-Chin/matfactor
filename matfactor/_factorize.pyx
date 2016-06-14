@@ -1,6 +1,6 @@
 #cython: boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 from cpython cimport bool
 
@@ -28,7 +28,8 @@ def factorize(x,
               int threads=8,
               bool verbose=True):
     """
-    factorize(x, dim=40, epochs=5, learning_rate=0.05, x_max, alpha=0.75, threads=8)
+    factorize(x, dim=40, epochs=5, shuffle=True, bias=False, learning_rate=0.05,
+    x_max=100, alpha=0.75, threads=8, verbose=True)
 
     Factorizes a sparse matrix `x` as `e ** (u * v)`
 
@@ -86,7 +87,7 @@ def factorize(x,
     x = x.tocoo()
     rows = x.row
     cols = x.col
-    vals = x.data
+    vals = x.data.astype(np.float64)
 
     coo_matrix = np.zeros(
         vals.shape[0],
@@ -94,8 +95,6 @@ def factorize(x,
     )
 
     bias_bit = bias
-
-
 
     if verbose:
         print("Reshaping matrix")
@@ -110,7 +109,6 @@ def factorize(x,
 
     if shuffle:
         np.random.shuffle(coo_matrix)
-
 
     n_rows = 0
     n_cols = 0
@@ -130,15 +128,15 @@ def factorize(x,
     if bias_bit:
         row_bias = np.zeros(n_rows)
         col_bias = np.zeros(n_cols)
-        rb_grad_sq = np.zeros(n_rows)
-        cb_grad_sq = np.zeros(n_cols)
+        rb_grad_sq = np.ones(n_rows)
+        cb_grad_sq = np.ones(n_cols)
 
     error = np.zeros(coo_matrix.shape[0])
 
     for epoch in range(epochs):
 
         if verbose:
-          print("Epoch %s: "%(epoch+1,), end='', flush=True)
+          print("Epoch %s: "%(epoch+1,), end='')
 
         for i in prange(coo_matrix.shape[0],
                         num_threads=threads,
@@ -175,8 +173,8 @@ def factorize(x,
                 row_bias[elem.row] -= fdiff / sqrt(rb_grad_sq[elem.row])
                 col_bias[elem.col] -= fdiff / sqrt(cb_grad_sq[elem.col])
                 fdiff = fdiff * fdiff
-                cb_grad_sq[elem.row] += fdiff
-                rb_grad_sq[elem.col] += fdiff
+                rb_grad_sq[elem.row] += fdiff
+                cb_grad_sq[elem.col] += fdiff
 
         total_error = 0.0
         for i in range(coo_matrix.shape[0]):
