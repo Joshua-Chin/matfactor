@@ -18,6 +18,7 @@ setup(
     url='https://github.com/Joshua-Chin/matfactor/tree/master',
     license='License :: OSI Approved :: Apache Software License',
     install_requires=['cython'],
+    packages=find_packages(),
     cmdclass={'build_ext':build_ext},
     ext_modules=[
         Extension(
